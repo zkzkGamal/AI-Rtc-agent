@@ -1,507 +1,163 @@
-# AI-RTC-Agent Client
+# Client: AI-RTC-Agent Frontend
 
-The React-based web frontend for real-time voice communication.
+A modern React web interface for real-time voice streaming to the AI-RTC-Agent backend via WebRTC.
 
-## 📋 Overview
+## Purpose
 
 The client provides:
-- **Intuitive UI** – Start/stop recording, room selection, status updates
-- **WebRTC Integration** – Peer connection management
-- **Audio Handling** – Local and remote audio playback
-- **Real-time Updates** – Connection status and error messages
+- **Voice Session Management** – Start/stop audio streaming sessions
+- **WebRTC Connection** – Establish peer connections and stream microphone audio
+- **Session Monitoring** – Display connection status, session ID, and errors
+- **Audio Visualizer** – Animated mic indicator showing active/idle state
 
-## 🏗️ Architecture
+## Technology Stack
 
-### Technology Stack
+- **Framework:** React 18 (functional components, hooks)
+- **Build Tool:** Vite 5
+- **Styling:** Vanilla CSS3 (dark glassmorphism theme)
+- **WebRTC:** Native browser `RTCPeerConnection` API
+- **API:** Fetch API (REST)
 
-- **Framework:** React 18
-- **Build Tool:** Vite
-- **Language:** JavaScript (JSX)
-- **Styling:** CSS
-- **Deployment:** Static hosting or dev server
-
-### Component Structure
+## Project Structure
 
 ```
-App
-├── UI Controls
-│   ├── Room Input
-│   ├── Start Button
-│   ├── Stop Button
-│   └── Status Display
-├── Audio Elements
-│   ├── Local Audio (input stream)
-│   └── Remote Audio (output stream)
-└── WebRTC Logic
-    ├── Peer Connection
-    ├── Offer/Answer Exchange
-    └── Track Management
+client/
+├── src/
+│   ├── components/
+│   │   ├── AudioVisualizer.jsx    # Animated microphone with pulsing rings
+│   │   ├── ControlButtons.jsx     # Start / Stop action buttons
+│   │   └── StatusDisplay.jsx      # Connection status, session ID, errors
+│   ├── services/
+│   │   ├── api.js                 # Server API calls (createSession, sendOffer)
+│   │   └── webrtc.js              # WebRTC lifecycle (connect, answer, close)
+│   ├── App.jsx                    # Main app shell (orchestrates services + components)
+│   ├── App.css                    # Global styles (dark glassmorphism theme)
+│   └── main.jsx                   # React entry point
+├── index.html                     # HTML shell
+├── package.json                   # Dependencies
+├── vite.config.js                 # Vite configuration (port 3000)
+└── README.md                      # This file
 ```
 
-## 🚀 Getting Started
+## Quick Start
 
-### Installation
+### 1. Install Dependencies
 
 ```bash
 cd client
 npm install
 ```
 
-### Development Server
+### 2. Start Development Server
 
 ```bash
 npm run dev
 ```
 
-Opens at `http://localhost:5173` (Vite default)
+Opens at `http://localhost:3000`
 
-### Build for Production
+> Make sure the backend server is running on `http://localhost:8080`
+
+### 3. Build for Production
 
 ```bash
 npm run build
-# Output: dist/
 ```
 
-### Preview Production Build
+## Architecture
 
-```bash
-npm run preview
-```
-
-## 📁 File Structure
+### Component + Service Pattern
 
 ```
-client/
-├── index.html              # HTML template
-├── vite.config.js         # Vite configuration
-├── package.json           # Dependencies & scripts
-├── package-lock.json      # Dependency lock file
-├── src/
-│   ├── main.jsx           # Entry point
-│   ├── App.jsx            # Main React component
-│   ├── App.css            # Styling
-│   └── assets/            # Images, fonts, etc.
-└── dist/                  # Build output (generated)
+App.jsx (orchestrator)
+  ├── services/api.js          → REST calls to backend
+  ├── services/webrtc.js       → RTCPeerConnection lifecycle
+  ├── components/AudioVisualizer.jsx
+  ├── components/StatusDisplay.jsx
+  └── components/ControlButtons.jsx
 ```
 
-## 🎯 User Flow
+### Session Flow
 
 ```
-1. Open App
-   ↓
-2. Grant Microphone Permission
-   ↓
-3. Enter Room Name (optional)
-   ↓
-4. Click "Start Recording"
-   ↓
-5. WebRTC Offer Created
-   ↓
-6. Offer Sent to Server
-   ↓
-7. Server Returns Answer
-   ↓
-8. Peer Connection Established
-   ↓
-9. Audio Streams In Real-Time
-   ↓
-10. Click "Stop" to Disconnect
+1. Click "Start"
+2. api.createSession()         → GET /session → session_id
+3. webrtc.createConnection()   → getUserMedia (mic) + RTCPeerConnection
+4. api.sendOffer(id, offer)    → POST /session/{id}/offer → SDP answer
+5. webrtc.applyAnswer(answer)  → Connection established
+6. Audio streams to server     → Server runs VAD + saves utterances
+7. Click "Stop"
+8. webrtc.closeConnection()    → Close PC + stop mic tracks
 ```
 
-## 🔧 Configuration
+## Services
 
-### Server Connection
+### `services/api.js`
 
-Edit `src/App.jsx` to change server URL:
+| Function | Description |
+|----------|-------------|
+| `createSession()` | `GET /session` → returns `session_id` |
+| `sendOffer(sessionId, offer)` | `POST /session/{id}/offer` → returns SDP answer |
 
-```javascript
-// Default: http://127.0.0.1:8080
-const SERVER_URL = "http://your-server.com:8080";
-```
+### `services/webrtc.js`
 
-### STUN Servers
+| Function | Description |
+|----------|-------------|
+| `createConnection(onStateChange)` | Creates `RTCPeerConnection`, gets microphone, generates SDP offer |
+| `applyAnswer(pc, answer)` | Sets remote SDP description from server |
+| `closeConnection(pc, stream)` | Closes peer connection and stops media tracks |
 
-Change ICE servers for different network conditions:
+**WebRTC configuration:**
+- ICE Server: `stun:stun.l.google.com:19302`
+- Audio constraints: `echoCancellation`, `noiseSuppression`, `autoGainControl`, `sampleRate: 48000`
+- ICE gathering timeout: 3 seconds
 
-```javascript
-const pc = new RTCPeerConnection({
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
-  ]
-});
-```
+## Components
 
-### Timeout Settings
+### `AudioVisualizer.jsx`
 
-Adjust connection timeout (in `App.jsx`):
+Animated microphone icon with three concentric pulsing rings. Shows `active` state when connected (green glow + ripple animation).
 
-```javascript
-const OFFER_TIMEOUT = 10000; // 10 seconds
-```
+**Props:** `isActive: boolean`
 
-## 🎛️ Features
+### `StatusDisplay.jsx`
 
-### Room Management
+Shows connection status dot (color-coded), status message, session ID (monospace), and error banner.
 
-- Default room: `"default"`
-- Custom room name input
-- Case-sensitive room names
-- Both users must join the same room
+**Props:** `status, statusMsg, sessionId, error`
 
-### Audio Controls
+### `ControlButtons.jsx`
 
-- **Start Recording** – Requests microphone, initiates WebRTC
-- **Stop** – Closes connection, releases microphone
+Start (green) and Stop (red) buttons with hover effects and proper disabled states.
 
-### Status Display
+**Props:** `onStart, onStop, isConnected, isBusy`
 
-Real-time status messages:
-- `"Press start and allow microphone access."`
-- `"Microphone access granted."`
-- `"Connecting..."`
-- `"WebRTC connected, streaming audio..."`
-- `"Stopped."`
-- `"Error: ..."`
+## Styling
 
-### Error Handling
+Dark glassmorphism theme with:
+- Deep dark background (`#080c14`) with subtle radial gradients
+- Frosted glass card (`backdrop-filter: blur(20px)`)
+- Inter font family (Google Fonts)
+- Color-coded status dots (idle/connecting/connected/error)
+- Animated ring visualizer on active connection
+- Responsive layout (mobile-friendly)
 
-Displays user-friendly error messages:
-- Microphone access denied
-- Server connection failure
-- Invalid SDP
-- Network errors
+## Browser Support
 
-## 🔌 API Integration
+| Browser | Support |
+|---------|---------|
+| Chrome  | ✅ Full |
+| Firefox | ✅ Full |
+| Safari  | ✅ Partial (WebRTC limitations) |
+| Edge    | ✅ Full |
 
-### Server Endpoint: `POST /offer`
+## Related Documentation
 
-**Request:**
-```javascript
-const response = await fetch(`${SERVER_URL}/offer`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    room: roomName,
-    sdp: pc.localDescription.sdp,
-    type: pc.localDescription.type
-  })
-});
-```
-
-**Response:**
-```json
-{
-  "sdp": "v=0\no=...",
-  "type": "answer"
-}
-```
-
-## 📊 UI Components
-
-### Buttons
-
-| Button | State | Action |
-|--------|-------|--------|
-| Start | Enabled | Request mic, create offer |
-| Stop | Disabled (until connected) | Close connection |
-
-### Inputs
-
-| Input | Placeholder | Default |
-|-------|------------|---------|
-| Room | "Room name" | "default" |
-
-### Audio Elements
-
-| Element | Purpose | Controls |
-|---------|---------|----------|
-| `<audio id="remoteAudio">` | Remote peer audio | autoplay, hidden |
-
-### Status
-
-- Real-time text display
-- Color-coded in CSS (error = red, success = green)
-
-## 🎨 Styling
-
-### App.css Structure
-
-- Reset/normalize styles
-- Button styling (primary, disabled states)
-- Input styling
-- Status message styling
-- Responsive design (mobile-friendly)
-
-## 🔄 WebRTC Flow
-
-### Initialization
-
-```javascript
-const pc = new RTCPeerConnection({
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-});
-```
-
-### Add Local Audio Track
-
-```javascript
-const stream = await navigator.mediaDevices.getUserMedia({
-  audio: true,
-  video: false
-});
-stream.getTracks().forEach(track => pc.addTrack(track, stream));
-```
-
-### Create & Send Offer
-
-```javascript
-const offer = await pc.createOffer();
-await pc.setLocalDescription(offer);
-const response = await fetch(`${SERVER_URL}/offer`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    room: roomName,
-    sdp: pc.localDescription.sdp,
-    type: pc.localDescription.type
-  })
-});
-```
-
-### Receive & Set Answer
-
-```javascript
-const answer = await response.json();
-await pc.setRemoteDescription(new RTCSessionDescription(answer));
-```
-
-### Handle Remote Audio
-
-```javascript
-pc.ontrack = event => {
-  const remoteAudio = document.getElementById("remoteAudio");
-  if (event.streams && event.streams[0]) {
-    remoteAudio.srcObject = event.streams[0];
-  }
-};
-```
-
-### Cleanup
-
-```javascript
-pc.close();
-stream.getTracks().forEach(t => t.stop());
-```
-
-## 🐛 Troubleshooting
-
-### Browser Console Errors
-
-**"Microphone access denied"**
-- Grant permission when browser prompts
-- Check browser settings → Privacy
-
-**"TypeError: Failed to fetch"**
-- Verify server is running
-- Check server URL in App.jsx
-- Verify CORS headers
-
-**"ERR_FAILED"**
-- Server connection issue
-- Network firewall blocking port 8080
-- CORS policy violation
-
-### Audio Not Playing
-
-**Check:**
-1. Remote audio element has `autoplay` attribute
-2. Peer connection is connected
-3. Logs show "Track received"
-4. Browser hasn't muted audio
-
-**Solution:**
-```javascript
-// Check connection state
-console.log("Connection state:", pc.connectionState);
-console.log("Connection state:", pc.connectionState);
-```
-
-### Microphone Not Requested
-
-**Cause:** User already denied permission
-
-**Solution:**
-- Clear browser storage: `DevTools → Application → Clear site data`
-- Use different browser or incognito window
-
-### Slow Audio / Lag
-
-**Check:**
-- Network latency: `ping <server>`
-- CPU usage: Open Task Manager
-- Server logs for errors
-
-**Solutions:**
-1. Move closer to server
-2. Reduce network congestion
-3. Use ethernet instead of WiFi
-
-## 🚀 Production Build
-
-### Build Optimizations
-
-```bash
-# Build with minification
-npm run build
-
-# Analyze bundle size
-npm run build -- --debug
-```
-
-### Output Structure
-
-```
-dist/
-├── index.html
-├── assets/
-│   ├── main.<hash>.js
-│   ├── App.<hash>.css
-│   └── vendor.<hash>.js
-└── vite.svg
-```
-
-### Hosting Options
-
-1. **Netlify** – Drag & drop `dist/` folder
-2. **Vercel** – Auto-deploy from Git
-3. **AWS S3 + CloudFront** – Static hosting
-4. **GitHub Pages** – Free hosting
-5. **nginx** – Self-hosted
-
-### Environment-Specific Configuration
-
-```javascript
-// src/App.jsx
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:8080";
-```
-
-**.env.production**
-```
-VITE_SERVER_URL=https://api.yourdomain.com:8080
-```
-
-## 🔐 Security
-
-### HTTPS Requirement
-
-- WebRTC in production browsers **requires HTTPS**
-- Self-signed certificates work for testing
-- Use Let's Encrypt for free SSL certificates
-
-### CORS
-
-- Verify server CORS configuration
-- Frontend must match server's allowed origins
-
-### Audio Permissions
-
-- Browser prompts user for microphone access
-- Permission is per-origin
-- Can be revoked in browser settings
-
-## 🧪 Testing
-
-### Manual Testing
-
-1. **Single User Test:**
-   - Open one tab
-   - Start recording
-   - Verify microphone permission
-   - Check status changes
-
-2. **Two User Test:**
-   - Open two tabs/windows
-   - Join same room
-   - Both click start
-   - Verify audio streams
-
-3. **Error Handling Test:**
-   - Deny microphone access
-   - Disconnect server
-   - Verify error messages
-
-### Browser Compatibility
-
-| Browser | Support | Notes |
-|---------|---------|-------|
-| Chrome | ✅ Full | Recommended |
-| Firefox | ✅ Full | Good support |
-| Safari | ✅ Partial | iOS limitations |
-| Edge | ✅ Full | Chromium-based |
-| IE | ❌ None | Not supported |
-
-## 📦 Dependencies
-
-### Core Dependencies
-
-- **react** (^18.3.1) – UI library
-- **react-dom** (^18.3.1) – DOM rendering
-
-### Development Dependencies
-
-- **vite** (^5.4.2) – Build tool
-- **@vitejs/plugin-react** (^4.3.1) – React integration
-- **@types/react** (^18.3.1) – TypeScript types
-- **@types/react-dom** (^18.3.1) – TypeScript types
-
-### Native APIs Used
-
-- `navigator.mediaDevices.getUserMedia()` – Microphone access
-- `RTCPeerConnection` – WebRTC peer
-- `RTCSessionDescription` – SDP handling
-- `fetch()` – HTTP requests
-- `HTMLAudioElement` – Audio playback
-
-## 🔗 Related Documentation
-
-- [Main README](../README.md)
-- [Server README](../server/README.md)
-- [WebRTC API](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API)
-- [React Documentation](https://react.dev)
-- [Vite Documentation](https://vitejs.dev)
-
-## 📝 Code Examples
-
-### Custom Server URL
-
-```javascript
-// src/App.jsx
-const SERVER_URL = "https://api.example.com:8080";
-```
-
-### Add ICE Candidate Logging
-
-```javascript
-pc.addEventListener("icecandidate", event => {
-  if (event.candidate) {
-    console.log("ICE candidate:", event.candidate);
-  }
-});
-```
-
-### Connection State Monitoring
-
-```javascript
-pc.addEventListener("connectionstatechange", () => {
-  console.log("Connection state:", pc.connectionState);
-  if (pc.connectionState === "failed") {
-    setStatus("Connection failed");
-  }
-});
-```
+- [Main README](../README.md) – Project overview
+- [Server README](../server/README.md) – Backend details
+- [Agent Module](../agent/README.md) – Future AI agent logic
 
 ---
 
-**Version:** 1.0.0  
+**Version:** 0.1.0  
 **Last Updated:** May 2026
