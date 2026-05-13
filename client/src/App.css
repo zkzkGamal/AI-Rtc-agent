@@ -1,0 +1,267 @@
+/* ============================================================
+   App.css  –  Voice AI Agent  (dark glassmorphism theme)
+   ============================================================ */
+
+/* ---------- Reset & base ---------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-deep:        #080c14;
+  --bg-card:        rgba(255,255,255,0.04);
+  --border-glow:    rgba(99,179,237,0.25);
+  --accent-blue:    #63b3ed;
+  --accent-cyan:    #76e4f7;
+  --accent-green:   #68d391;
+  --accent-red:     #fc8181;
+  --accent-yellow:  #f6e05e;
+  --text-primary:   #e2e8f0;
+  --text-muted:     #718096;
+  --radius:         16px;
+  --radius-sm:      10px;
+  --shadow:         0 8px 32px rgba(0,0,0,0.5);
+  --transition:     all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+}
+
+/* ---------- Animated gradient background ---------- */
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(99,179,237,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 90% 80%,  rgba(118,228,247,0.08) 0%, transparent 60%),
+    var(--bg-deep);
+  min-height: 100vh;
+}
+
+/* ---------- Layout ---------- */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  gap: 24px;
+}
+
+/* ---------- Header ---------- */
+.app-header {
+  text-align: center;
+}
+
+.app-header h1 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 60%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-header p {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+/* ---------- Main card ---------- */
+.agent-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ---------- Visualizer (animated rings) ---------- */
+.visualizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 140px;
+  position: relative;
+}
+
+.visualizer-core {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+  box-shadow: 0 0 24px rgba(99,179,237,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  z-index: 2;
+}
+
+.visualizer-core svg {
+  width: 28px;
+  height: 28px;
+  fill: white;
+}
+
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(99,179,237,0.3);
+  animation: none;
+}
+.ring-1 { width: 90px;  height: 90px; }
+.ring-2 { width: 118px; height: 118px; }
+.ring-3 { width: 140px; height: 140px; border-color: rgba(99,179,237,0.12); }
+
+/* Active / speaking state */
+.visualizer.active .visualizer-core {
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+  box-shadow: 0 0 40px rgba(104,211,145,0.5);
+  animation: pulse-core 1.4s ease-in-out infinite;
+}
+.visualizer.active .ring-1 { animation: ripple 2.0s ease-out infinite; }
+.visualizer.active .ring-2 { animation: ripple 2.0s ease-out infinite 0.4s; }
+.visualizer.active .ring-3 { animation: ripple 2.0s ease-out infinite 0.8s; }
+
+@keyframes pulse-core {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.08); }
+}
+@keyframes ripple {
+  0%   { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+/* ---------- Status block ---------- */
+.status-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+  transition: var(--transition);
+}
+.status-dot.idle        { background: var(--text-muted); }
+.status-dot.connecting  { background: var(--accent-yellow); animation: blink 1s step-start infinite; }
+.status-dot.connected   { background: var(--accent-green); }
+.status-dot.error       { background: var(--accent-red); }
+
+@keyframes blink { 50% { opacity: 0; } }
+
+.status-label { color: var(--text-muted); min-width: 80px; }
+.status-value { color: var(--text-primary); font-weight: 500; }
+
+.session-id {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--accent-blue);
+  background: rgba(99,179,237,0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  word-break: break-all;
+}
+
+/* ---------- Error banner ---------- */
+.error-banner {
+  background: rgba(252,129,129,0.1);
+  border: 1px solid rgba(252,129,129,0.3);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--accent-red);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* ---------- Buttons ---------- */
+.btn-row {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  flex: 1;
+  padding: 14px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: 0.2px;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-start {
+  background: linear-gradient(135deg, #38a169, #68d391);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(104,211,145,0.3);
+}
+.btn-start:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(104,211,145,0.45);
+}
+.btn-start:not(:disabled):active { transform: translateY(0); }
+
+.btn-stop {
+  background: linear-gradient(135deg, #c53030, #fc8181);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(252,129,129,0.25);
+}
+.btn-stop:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(252,129,129,0.4);
+}
+.btn-stop:not(:disabled):active { transform: translateY(0); }
+
+/* ---------- Footer ---------- */
+.app-footer {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  opacity: 0.6;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 480px) {
+  .agent-card { padding: 28px 20px; }
+  .btn-row    { flex-direction: column; }
+}

@@ -1,0 +1,25 @@
+# Development Requirements for Server
+# Install with: pip install -r requirements-dev.txt
+
+# Production dependencies
+-r requirements.txt
+
+# Testing
+pytest>=7.0.0              # Unit testing framework
+pytest-asyncio>=0.20.0     # Async test support
+pytest-cov>=4.0.0          # Code coverage
+
+# Code Quality
+black>=23.0.0              # Code formatter
+flake8>=6.0.0              # Linter
+isort>=5.11.0              # Import sorter
+mypy>=1.0.0                # Static type checker
+
+# Development
+ipython>=8.0.0             # Enhanced Python shell
+ipdb>=0.13.0               # IPython debugger
+watchdog>=3.0.0            # File system monitoring
+
+# Documentation
+sphinx>=6.0.0              # Documentation generator
+sphinx-rtd-theme>=1.2.0    # ReadTheDocs theme

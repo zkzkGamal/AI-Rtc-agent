@@ -1,0 +1,14 @@
+# AI-RTC-Agent Server Dependencies
+# Python 3.10+ required
+
+# WebRTC & Networking
+aiortc>=1.9.0              # WebRTC implementation (peer connection, SDP handling)
+aiohttp>=3.9.0             # Async HTTP server framework
+aiohttp-cors>=0.7.0        # CORS middleware for cross-origin requests
+
+# Audio Processing
+webrtcvad>=2.0.10          # Voice Activity Detection (speech/silence detection)
+numpy>=1.26.0              # Numerical operations for audio processing
+
+# Optional but recommended for production
+python-dotenv>=1.0.0       # Environment variable management
