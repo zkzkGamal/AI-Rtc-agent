@@ -1,6 +1,6 @@
 """
 main.py  –  AI-RTC-Agent backend server
-Uses aiohttp + aiortc to handle WebRTC sessions.
+Uses aiohttp + aiortc to handle WebRTC audio sessions.
 Each user gets an isolated session with its own RTCPeerConnection and AudioSession.
 
 Run:
@@ -9,13 +9,12 @@ Listens on 0.0.0.0:8080
 """
 
 import asyncio
-import json
 import logging
-import struct
 import uuid
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+import numpy as np
 import aiohttp_cors
 from aiohttp import web
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
@@ -28,9 +27,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Session registry
-# ---------------------------------------------------------------------------
+
+# ─── Session Model ──────────────────────────────────────────────────
 
 @dataclass
 class Session:
@@ -40,38 +38,47 @@ class Session:
     tasks: list = field(default_factory=list)
 
 
-# In-memory session store  { session_id → Session }
+# In-memory session store { session_id → Session }
 _sessions: Dict[str, Session] = {}
 
 
-# ---------------------------------------------------------------------------
-# Audio receive loop
-# ---------------------------------------------------------------------------
+# ─── Audio Receive Loop ────────────────────────────────────────────
 
-async def _receive_audio(track: MediaStreamTrack, session: Session) -> None:
+async def _consume_audio_track(track: MediaStreamTrack, session: Session) -> None:
     """
-    Continuously pull frames from the incoming WebRTC audio track,
-    convert each av.AudioFrame to raw 16-bit mono PCM,
-    and hand them off to the AudioSession for VAD + buffering.
+    Continuously pull frames from the WebRTC audio track,
+    convert to raw 16-bit mono PCM bytes, and feed to AudioSession.
+
+    Key fix: use numpy .tobytes() and properly detect int16 vs float32 formats.
     """
-    logger.info(f"[{session.session_id}] Audio receive loop started")
+    logger.info(f"[{session.session_id}] Audio track consumer started")
     try:
         while True:
             try:
                 frame = await track.recv()
             except Exception:
-                # Track ended or peer disconnected
                 break
 
-            # av.AudioFrame → numpy → 16-bit mono PCM bytes
-            # frame.format is usually 'fltp' (float32 planar) from browsers
-            audio_array = frame.to_ndarray()           # shape: (channels, samples)
-            if audio_array.ndim > 1:
-                audio_array = audio_array[0]           # take first channel (mono)
+            # av.AudioFrame → numpy array
+            # Shape: (channels, samples) for planar formats, (samples,) for packed
+            audio = frame.to_ndarray()
 
-            # Convert float32 to 16-bit PCM
-            pcm_int16 = (audio_array * 32767).clip(-32768, 32767).astype("int16")
-            pcm_bytes = struct.pack(f"<{len(pcm_int16)}h", *pcm_int16)
+            # Extract mono channel
+            if audio.ndim > 1:
+                mono = audio[0]
+            else:
+                mono = audio
+
+            # Convert to int16 PCM based on the actual dtype
+            if mono.dtype == np.float32 or mono.dtype == np.float64:
+                # Float audio: range [-1.0, 1.0] → int16 [-32768, 32767]
+                pcm_int16 = (np.clip(mono, -1.0, 1.0) * 32767).astype(np.int16)
+            else:
+                # Already integer (int16 from Opus/s16 format) — use directly
+                pcm_int16 = mono.astype(np.int16)
+
+            # Convert to raw bytes using numpy (fast, correct)
+            pcm_bytes = pcm_int16.tobytes()
 
             sample_rate = frame.sample_rate or 48000
             await session.audio_session.add_frame(pcm_bytes, sample_rate)
@@ -79,14 +86,12 @@ async def _receive_audio(track: MediaStreamTrack, session: Session) -> None:
     except asyncio.CancelledError:
         pass
     finally:
-        logger.info(f"[{session.session_id}] Audio receive loop ended")
+        logger.info(f"[{session.session_id}] Audio track consumer ended")
         if session.audio_session:
             await session.audio_session.close()
 
 
-# ---------------------------------------------------------------------------
-# Session cleanup
-# ---------------------------------------------------------------------------
+# ─── Session Cleanup ───────────────────────────────────────────────
 
 async def _cleanup_session(session_id: str) -> None:
     session = _sessions.pop(session_id, None)
@@ -99,15 +104,10 @@ async def _cleanup_session(session_id: str) -> None:
         await session.pc.close()
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
+# ─── Routes ────────────────────────────────────────────────────────
 
 async def handle_create_session(request: web.Request) -> web.Response:
-    """
-    GET /session
-    Creates a new session, returns { session_id }
-    """
+    """GET /session → { session_id }"""
     session_id = str(uuid.uuid4())
     _sessions[session_id] = Session(session_id=session_id)
     logger.info(f"[{session_id}] Session created")
@@ -117,8 +117,8 @@ async def handle_create_session(request: web.Request) -> web.Response:
 async def handle_offer(request: web.Request) -> web.Response:
     """
     POST /session/{session_id}/offer
-    Body: { sdp: string, type: "offer" }
-    Sets up RTCPeerConnection for the session, returns SDP answer.
+    Body: { sdp, type }
+    Returns: { sdp, type } (answer)
     """
     session_id = request.match_info["session_id"]
 
@@ -127,13 +127,12 @@ async def handle_offer(request: web.Request) -> web.Response:
 
     session = _sessions[session_id]
 
-    # Parse offer
     try:
         body = await request.json()
         offer = RTCSessionDescription(sdp=body["sdp"], type=body["type"])
     except Exception as exc:
-        logger.error(f"[{session_id}] Bad offer payload: {exc}")
-        return web.json_response({"error": "Invalid offer payload"}, status=400)
+        logger.error(f"[{session_id}] Bad offer: {exc}")
+        return web.json_response({"error": "Invalid offer"}, status=400)
 
     # Create AudioSession and PeerConnection
     session.audio_session = AudioSession(session_id=session_id)
@@ -141,9 +140,9 @@ async def handle_offer(request: web.Request) -> web.Response:
     session.pc = pc
 
     @pc.on("connectionstatechange")
-    async def on_state_change():
+    async def on_connection_state():
         state = pc.connectionState
-        logger.info(f"[{session_id}] Connection state → {state}")
+        logger.info(f"[{session_id}] Connection state: {state}")
         if state in ("failed", "closed", "disconnected"):
             await _cleanup_session(session_id)
 
@@ -151,8 +150,7 @@ async def handle_offer(request: web.Request) -> web.Response:
     def on_track(track: MediaStreamTrack):
         if track.kind == "audio":
             logger.info(f"[{session_id}] Audio track received")
-            loop = asyncio.get_event_loop()
-            task = loop.create_task(_receive_audio(track, session))
+            task = asyncio.ensure_future(_consume_audio_track(track, session))
             session.tasks.append(task)
 
     # SDP negotiation
@@ -167,18 +165,15 @@ async def handle_offer(request: web.Request) -> web.Response:
     })
 
 
-# ---------------------------------------------------------------------------
-# App factory
-# ---------------------------------------------------------------------------
+# ─── App Factory ───────────────────────────────────────────────────
 
 def create_app() -> web.Application:
     app = web.Application()
 
-    # Routes
     app.router.add_get("/session", handle_create_session)
     app.router.add_post("/session/{session_id}/offer", handle_offer)
 
-    # CORS – allow all origins (restrict in production)
+    # CORS — allow all origins (restrict in production)
     cors = aiohttp_cors.setup(app, defaults={
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=True,
@@ -193,9 +188,7 @@ def create_app() -> web.Application:
     return app
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# ─── Entry Point ───────────────────────────────────────────────────
 
 if __name__ == "__main__":
     app = create_app()

@@ -2,13 +2,16 @@
 # Python 3.10+ required
 
 # WebRTC & Networking
-aiortc>=1.9.0              # WebRTC implementation (peer connection, SDP handling)
-aiohttp>=3.9.0             # Async HTTP server framework
-aiohttp-cors>=0.7.0        # CORS middleware for cross-origin requests
+aiortc>=1.9.0                    # WebRTC implementation (peer connection, SDP handling)
+aiohttp>=3.9.0                   # Async HTTP server framework
+aiohttp-cors>=0.7.0              # CORS middleware for cross-origin requests
+python-socketio>=5.9.0           # WebSocket support for real-time events
 
 # Audio Processing
-webrtcvad>=2.0.10          # Voice Activity Detection (speech/silence detection)
-numpy>=1.26.0              # Numerical operations for audio processing
+webrtcvad>=2.0.10                # Voice Activity Detection (speech/silence detection)
+numpy>=1.26.0                    # Numerical operations for audio processing
+scipy>=1.10.0                    # Audio resampling and processing
 
-# Optional but recommended for production
-python-dotenv>=1.0.0       # Environment variable management
+python-dotenv>=1.0.0             # Environment variable management
+pydantic>=2.0.0                  # Data validation and settings management
+redis>=4.5.0                     # Caching and session management (optional)

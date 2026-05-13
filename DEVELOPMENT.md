@@ -206,8 +206,7 @@ AI-RTC-Agent/
 │   └── README.md
 │
 ├── README.md                    # Main docs
-├── CONTRIBUTING.md              # Contribution guide
-└── QUICKSTART.md                # Quick start
+└── CONTRIBUTING.md              # Contribution guide
 ```
 
 ## 🔄 Development Workflow
